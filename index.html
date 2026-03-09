@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1win Mines Clone</title>
+    <script src="https://telegram.org"></script>
+    <style>
+        body { background: #1a1d21; color: white; font-family: sans-serif; text-align: center; }
+        .grid { display: grid; grid-template-columns: repeat(5, 60px); gap: 10px; justify-content: center; margin-top: 20px; }
+        .cell { width: 60px; height: 60px; background: #2b3035; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 24px; cursor: pointer; }
+        .cell.open { background: #007aff; }
+        .cell.mine { background: #ff3b30; }
+        .btn { background: #007aff; border: none; color: white; padding: 15px 30px; border-radius: 10px; font-weight: bold; margin-top: 20px; width: 200px; }
+    </style>
+</head>
+<body>
+    <h3>Mines - $1win Style</h3>
+    <div id="balance">Balance: $0.00</div>
+    <div class="grid" id="grid"></div>
+    <button class="btn" onclick="startGame()">NEW GAME</button>
+
+    <script>
+        let tg = window.Telegram.WebApp;
+        tg.expand();
+
+        let mines = [];
+        const grid = document.getElementById('grid');
+
+        function createGrid() {
+            grid.innerHTML = '';
+            for (let i = 0; i < 25; i++) {
+                let cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.onclick = () => openCell(i, cell);
+                grid.appendChild(cell);
+            }
+        }
+
+        function startGame() {
+            mines = Array.from({length: 25}, (_, i) => i).sort(() => Math.random() - 0.5).slice(0, 3);
+            createGrid();
+            tg.HapticFeedback.impactOccurred('medium');
+        }
+
+        function openCell(index, cell) {
+            if (mines.includes(index)) {
+                cell.innerHTML = '💣';
+                cell.classList.add('mine');
+                alert('BOOM! Game Over');
+                startGame();
+            } else {
+                cell.innerHTML = '💎';
+                cell.classList.add('open');
+                tg.HapticFeedback.notificationOccurred('success');
+            }
+        }
+
+        createGrid();
+    </script>
+</body>
+</html>
