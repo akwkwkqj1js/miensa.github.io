@@ -54,32 +54,46 @@
         }
 
         function start() {
+            // УБРАНА ПРОВЕРКА БАЛАНСА
             bet = parseFloat(document.getElementById('bet').value) || 0;
             let count = parseInt(document.getElementById('mCount').value);
+            
             mines = [];
             while(mines.length < count) {
                 let r = Math.floor(Math.random()*25);
                 if(!mines.includes(r)) mines.push(r);
             }
-            isPlay = true; opened = 0; createGrid();
+            
+            isPlay = true; 
+            opened = 0; 
+            currentMult = 1;
+            createGrid();
+            
             document.getElementById('btn-p').style.display = 'none';
+            document.getElementById('btn-c').style.display = 'none';
             document.getElementById('win-text').innerText = bet.toFixed(2) + " ₽";
+            document.getElementById('mult-text').innerText = "Множитель: x1.00";
         }
 
         async function click(i, el) {
             if(!isPlay || el.classList.contains('open')) return;
+            
             if(mines.includes(i)) {
-                el.classList.add('mine-hit'); el.innerHTML = "💣";
+                el.classList.add('mine-hit'); 
+                el.innerHTML = "💣";
                 isPlay = false;
                 await revealMines();
-                sendResult(0);
+                setTimeout(() => sendResult(0), 1000);
             } else {
-                opened++; el.classList.add('open'); el.innerHTML = "💎";
-                currentMult = (Math.pow(1.25, opened)).toFixed(2); // Увеличил иксы для кайфа
+                opened++; 
+                el.classList.add('open'); 
+                el.innerHTML = "💎";
+                // Формула икса (1.20 за каждый алмаз)
+                currentMult = (Math.pow(1.20, opened)).toFixed(2);
                 document.getElementById('win-text').innerText = (bet * currentMult).toFixed(2) + " ₽";
                 document.getElementById('mult-text').innerText = "Множитель: x" + currentMult;
                 document.getElementById('btn-c').style.display = 'block';
-                tg.HapticFeedback.impactOccurred('heavy');
+                tg.HapticFeedback.impactOccurred('medium');
             }
         }
 
@@ -89,17 +103,19 @@
                 if(!cells[mIdx].classList.contains('mine-hit')) {
                     cells[mIdx].classList.add('open');
                     cells[mIdx].innerHTML = "💣";
-                    await new Promise(r => setTimeout(r, 80));
+                    await new Promise(r => setTimeout(r, 100));
                 }
             }
         }
 
-        function cashout() { sendResult(bet * currentMult); }
+        function cashout() { 
+            sendResult(bet * currentMult); 
+        }
 
         function sendResult(winAmount) {
-            // Отправляем данные боту, чтобы он просто вывел сообщение о результате
+            // Отправляем объект с флагом unlimited
             tg.sendData(JSON.stringify({win: winAmount, bet: bet, unlimited: true}));
-            setTimeout(() => tg.close(), 500);
+            tg.close();
         }
 
         createGrid();
