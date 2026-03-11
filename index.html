@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mines V4 Full Fix</title>
+    <!-- Добавлена версия к скрипту для пробития кэша -->
+    <script src="https://telegram.org"></script>
+    <style>
+        body { background: #0b1014; color: white; font-family: -apple-system, sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; user-select: none; -webkit-tap-highlight-color: transparent; }
+        .card { background: #151a21; width: 100%; max-width: 330px; padding: 20px; border-radius: 20px; border: 1px solid #232a33; text-align: center; margin-bottom: 20px; box-sizing: border-box; box-shadow: 0 10px 20px rgba(0,0,0,0.3); }
+        .bal-label { color: #888; font-size: 12px; letter-spacing: 1px; margin-bottom: 5px; }
+        .bal-val { color: #ff9500; font-size: 36px; font-weight: 900; }
+        .win-val { color: #00ff41; font-size: 24px; font-weight: bold; margin-top: 10px; min-height: 28px; }
+        
+        .grid-box { background: #080c10; padding: 12px; border-radius: 24px; border: 3px solid #1c2530; box-shadow: inset 0 0 15px rgba(0,0,0,0.5); }
+        .grid { display: grid; grid-template-columns: repeat(5, 58px); gap: 10px; }
+        
+        /* Стиль ячеек как на твоем скрине */
+        .cell { width: 58px; height: 58px; background: linear-gradient(145deg, #1e83b1, #135b80); border-radius: 12px; cursor: pointer; box-shadow: 0 5px #0d3d55; display: flex; align-items: center; justify-content: center; font-size: 26px; transition: transform 0.1s, box-shadow 0.1s; }
+        .cell:active { transform: translateY(3px); box-shadow: 0 2px #0d3d55; }
+        .cell.open { background: #1a222c; box-shadow: none; transform: scale(0.92); border: 1px solid #333; }
+        .cell.mine { background: #ff3b30 !important; box-shadow: 0 0 25px #ff3b30; z-index: 10; }
+
+        .controls { width: 100%; max-width: 330px; margin-top: 20px; }
+        input, select { width: 100%; padding: 16px; margin-bottom: 12px; background: #151a21; border: 1px solid #333; color: white; border-radius: 14px; font-size: 16px; box-sizing: border-box; outline: none; transition: 0.3s; }
+        input:focus { border-color: #007aff; }
+        
+        .btn { width: 100%; padding: 18px; border-radius: 16px; border: none; font-weight: 800; font-size: 20px; cursor: pointer; transition: 0.2s; active { transform: scale(0.98); } }
+        .btn-play { background: #007aff; color: white; box-shadow: 0 4px #005bb5; }
+        .btn-cashout { background: #ff9500; color: white; box-shadow: 0 4px #c27100; display: none; margin-top: 10px; }
+    </style>
+</head>
+<body onload="initV4()">
+
+    <div class="card">
+        <div class="bal-label">ТЕКУЩИЙ БАЛАНС</div>
+        <div class="bal-val">∞ ₽</div>
+        <div class="win-val" id="win-txt">0.00 ₽</div>
+        <div id="m-txt" style="color: #666; font-size: 14px;">Множитель: x1.00</div>
+    </div>
+
+    <div class="grid-bg">
+        <div class="grid-box">
+            <div class="grid" id="g"></div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <input type="number" id="b" value="1000" inputmode="numeric">
+        <select id="m">
+            <option value="3">3 мины</option>
+            <option value="5">5 мин</option>
+            <option value="10">10 мин</option>
+            <option value="20">20 мин</option>
+        </select>
+        <button class="btn btn-play" id="p" onclick="v4Start()">ИГРАТЬ (V4 FIX)</button>
+        <button class="btn btn-cashout" id="c" onclick="v4Cash()">ЗАБРАТЬ</button>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        let isP = false, mines = [], op = 0, bet = 0, mult = 1;
+
+        function initV4() {
+            tg.ready();
+            tg.expand();
+            drawGrid();
+        }
+
+        function drawGrid() {
+            const grid = document.getElementById('g');
+            grid.innerHTML = '';
+            for(let i=0; i<25; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.onclick = () => v4Click(i, cell);
+                grid.appendChild(cell);
+            }
+        }
+
+        function v4Start() {
+            bet = parseFloat(document.getElementById('b').value) || 0;
+            const count = parseInt(document.getElementById('m').value);
+            
+            // Генерация мин
+            mines = [];
+            while(mines.length < count) {
+                let r = Math.floor(Math.random() * 25);
+                if(!mines.includes(r)) mines.push(r);
+            }
+            
+            isP = true; op = 0; mult = 1;
+            drawGrid();
+            
+            document.getElementById('p').style.display = 'none';
+            document.getElementById('c').style.display = 'none';
+            document.getElementById('win-txt').innerText = bet.toFixed(2) + " ₽";
+            document.getElementById('m-txt').innerText = "Множитель: x1.00";
+            
+            if(tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+        }
+
+        async function v4Click(i, el) {
+            if(!isP || el.classList.contains('open')) return;
+
+            if(mines.includes(i)) {
+                isP = false;
+                el.classList.add('mine');
+                el.innerHTML = "💣";
+                await v4Reveal();
+                setTimeout(() => v4Done(0), 1200);
+            } else {
+                op++;
+                el.classList.add('open');
+                el.innerHTML = "💎";
+                // Динамический икс
+                mult = (Math.pow(1.22, op)).toFixed(2);
+                document.getElementById('win-txt').innerText = (bet * mult).toFixed(2) + " ₽";
+                document.getElementById('m-txt').innerText = "Множитель: x" + mult;
+                document.getElementById('c').style.display = 'block';
+                if(tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            }
+        }
+
+        async function v4Reveal() {
+            const cells = document.getElementsByClassName('cell');
+            for(let m of mines) {
+                if(!cells[m].classList.contains('mine')) {
+                    cells[m].classList.add('open');
+                    cells[m].innerHTML = "💣";
+                    await new Promise(r => setTimeout(r, 80));
+                }
+            }
+            if(tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
+        }
+
+        function v4Cash() { v4Done(bet * mult); }
+
+        function v4Done(win) {
+            const res = JSON.stringify({win: win, bet: bet, unlimited: true});
+            tg.sendData(res);
+            tg.close();
+        }
+    </script>
+</body>
+</html>
